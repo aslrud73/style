@@ -277,6 +277,26 @@ const phSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 function esc(s){return (s||"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function toast(msg,err){const t=$("#toast");t.textContent=msg;t.className="toast show"+(err?" err":"");setTimeout(()=>t.className="toast",2400);}
 
+// 이미지 로드 실패 시 플레이스홀더로 안전하게 교체
+function attachImgFallback(root){
+  (root||document).querySelectorAll("img[data-fallback]").forEach(img=>{
+    if(img.dataset.bound)return;
+    img.dataset.bound="1";
+    img.addEventListener("error",()=>{
+      const kind=img.dataset.fallback;
+      const box=document.createElement("div");
+      if(kind==="modal"){
+        box.className="modal-img-ph";
+        box.innerHTML=`${phSVG}<span>이미지 없음</span>`;
+        img.replaceWith(box);
+      }else{
+        const thumb=img.closest(".thumb");
+        if(thumb){thumb.innerHTML="";const ph=document.createElement("div");ph.className="ph";ph.innerHTML=`${phSVG}<span>이미지 없음</span>`;thumb.appendChild(ph);}
+      }
+    });
+  });
+}
+
 /* ===== PIN ===== */
 const pinInput=$("#pinInput");
 pinInput.addEventListener("input",e=>{
@@ -351,19 +371,20 @@ function render(){
   list.forEach(s=>{
     const card=document.createElement("div");card.className="card";
     const thumb=s.image
-      ? `<div class="thumb"><img src="${esc(s.image)}" alt="${esc(s.name)}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=\\'ph\\'>${phSVG}<span>이미지 없음</span></div>'"></div>`
+      ? `<div class="thumb"><img src="${esc(s.image)}" alt="${esc(s.name)}" loading="lazy" data-fallback="card"></div>`
       : `<div class="thumb"><div class="ph">${phSVG}<span>NO IMAGE</span></div></div>`;
     const tags=(s.tags||[]).slice(0,4).map(t=>`<span class="mini-tag">${esc(t)}</span>`).join("");
     card.innerHTML=`${thumb}<div class="card-body"><span class="cat-tag">${esc(s.category)}</span><h3>${esc(s.name)}</h3><div class="card-tags">${tags}</div></div>`;
     card.onclick=()=>openView(s);
     grid.appendChild(card);
   });
+  attachImgFallback(grid);
 }
 
 /* ===== 보기 ===== */
 function openView(s){
   const img=s.image
-    ? `<img class="modal-img" src="${esc(s.image)}" alt="${esc(s.name)}" onerror="this.outerHTML='<div class=\\'modal-img-ph\\'>${phSVG}<span>이미지 없음</span></div>'">`
+    ? `<img class="modal-img" src="${esc(s.image)}" alt="${esc(s.name)}" data-fallback="modal">`
     : `<div class="modal-img-ph">${phSVG}<span>NO IMAGE</span></div>`;
   $("#viewModal").innerHTML=`
     ${img}
@@ -382,6 +403,7 @@ function openView(s){
       <div class="prompt-box">${esc(s.prompt)}</div>
     </div>`;
   $("#viewOverlay").classList.add("open");document.body.style.overflow="hidden";
+  attachImgFallback($("#viewModal"));
   $("#copyBtn").onclick=()=>copyPrompt(s.prompt);
   $("#vEdit").onclick=()=>{closeView();openEditForm(s);};
 }
